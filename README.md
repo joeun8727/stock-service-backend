@@ -175,8 +175,8 @@ Base URL: `http://localhost:8080/api/v1`
         ↓
 ④ llm_processed=false 로 DB 저장 (원문 본문 저장 금지)
         ↓
-⑤ Gemini 2.0 Flash LLM 분석 배치
-   → 일일 잔여 호출량 확인 (1,500건 한도)
+⑤ Gemini 2.5 Flash-Lite LLM 분석 배치
+   → 일일 잔여 호출량 확인 (1,000건 한도; 실측 일 20건)
    → Rate Limit 초과 시 다음 주기에 재처리 (llm_processed=false 유지)
 ```
 
@@ -186,7 +186,7 @@ Base URL: `http://localhost:8080/api/v1`
 |------|---------|--------|------|
 | Circuit Breaker | 실패율 50% → OPEN, 30초 후 half-open | 동일 | 실패율 50% → OPEN, 60초 |
 | Retry | 최대 3회, 지수 백오프 (1s→2s→4s) | 최대 3회, 2s→4s→8s | 최대 3회, 1s |
-| Rate Limiter | **55 req/min** | **13 req/min** | 제한 없음 |
+| Rate Limiter | **55 req/min** | **8 req/min** | 제한 없음 |
 
 ---
 
@@ -222,7 +222,7 @@ GEMINI_API_KEY=<your_gemini_key>
 > API 키 발급:
 > - Finnhub: https://finnhub.io (무료 플랜, 분당 60건)
 > - FRED: https://fred.stlouisfed.org/docs/api/api_key.html (무료)
-> - Gemini: https://aistudio.google.com (무료 플랜, 분당 15건 / 일 1,500건)
+> - Gemini: https://aistudio.google.com (무료 플랜, 분당 10건 / 일 1,000건)
 
 ### 2-A. Docker Compose로 전체 실행 (권장)
 
@@ -317,3 +317,29 @@ curl http://localhost:8080/api/v1/stocks/AAPL
 - 뉴스 원문 본문 저장·제공 금지 (헤드라인 + LLM 요약 + 출처 링크만)
 - 투자 권유 표현 금지 (LLM 프롬프트에 명시)
 - 외부 API 키 로그·응답 노출 금지
+
+---
+
+## 라이선스
+
+본 프로젝트는 MIT License를 따릅니다.
+
+---
+
+## 면책 및 이용 안내 (Disclaimer)
+
+본 저장소는 개인 학습·포트폴리오 목적의 예제 코드이며, 실제 운영 중인
+서비스가 아닙니다.
+
+- 본 프로젝트는 투자 추천·자문을 제공하지 않으며, 어떠한 금융 정보도 실제로
+  서비스하지 않습니다. 코드는 구현 방식을 보여주기 위한 것입니다.
+- 외부 API(Finnhub, FRED, Google Gemini)를 연동하는 코드가 포함되어 있으나,
+  각 API의 데이터·서비스를 재배포하지 않습니다. 본 코드를 실행·이용할 경우,
+  각 제공처의 이용약관(ToS)을 직접 확인하고 준수하는 것은 이용자 본인의
+  책임입니다.
+  - Finnhub: https://finnhub.io/terms-of-service
+  - FRED: https://fred.stlouisfed.org/legal/
+  - Google Gemini: https://policies.google.com/terms
+- API 키 등 민감 정보는 포함되어 있지 않으며, 이용자가 각자 발급받아 .env로
+  주입해야 합니다.
+- 본 코드의 사용으로 발생하는 모든 결과에 대한 책임은 이용자에게 있습니다.
