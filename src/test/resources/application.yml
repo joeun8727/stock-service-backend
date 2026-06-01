@@ -1,0 +1,62 @@
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+  jpa:
+    hibernate:
+      ddl-auto: validate   # V1__init.sql과 엔티티 매핑 일치 여부를 테스트가 검증
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# 외부 API — 테스트 슬라이스(@DataJpaTest 등)에서 컨텍스트 로드 실패 방지용 더미값
+external:
+  finnhub:
+    api-key: "test-key"
+    base-url: "http://localhost:9999"
+    rate-limit-per-minute: 55
+  fred:
+    api-key: "test-key"
+    base-url: "http://localhost:9999"
+  gemini:
+    api-key: "test-key"
+    base-url: "http://localhost:9999"
+    model: "gemini-2.0-flash"
+    rate-limit-per-minute: 13
+    rate-limit-per-day: 1500
+
+# HTTP Client 타임아웃 (테스트에서도 참조됨)
+http:
+  client:
+    connect-timeout-seconds: 3
+    read-timeout-seconds: 10
+
+# 뉴스 수집 설정 — 테스트용 더미
+news:
+  keywords:
+    include: "earnings,revenue,test"
+  collect:
+    lookback-days: 1
+  gemini:
+    daily-limit: 1500
+    per-run-batch: 50
+
+# 스크리닝 가중치 — 테스트용 더미 (단위테스트는 ReflectionTestUtils로 직접 주입)
+screening:
+  weights:
+    revenue-growth: 0.40
+    roic-trend: 0.25
+    operating-margin-trend: 0.20
+    market-cap-potential: 0.15
+  max-growth-market-cap: 500000000000
+
+# 스케줄러 테스트 환경에서 비활성화
+scheduler:
+  news-collection:
+    cron: "-"
+  sector-ranking:
+    cron: "-"
+  financial-metrics:
+    cron: "-"

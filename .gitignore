@@ -1,0 +1,32 @@
+# 빌드 산출물
+build/
+.gradle/
+out/
+
+# 환경변수 파일 (API 키, 비밀번호 포함 — 절대 커밋 금지)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
+logs/
+
+# Claude Code 로컬 설정 (개인 설정 포함 가능)
+.claude/settings.local.json
+
+# Spring Boot 자동 생성 파일
+HELP.md
+
+# Gradle wrapper 캐시
+gradle/wrapper/gradle-wrapper.jar

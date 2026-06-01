@@ -1,0 +1,176 @@
+spring:
+  application:
+    name: stock-service-backend
+
+  # 데이터소스 (MySQL)
+  datasource:
+    url: jdbc:mysql://localhost:3306/${MYSQL_DATABASE}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+    username: ${MYSQL_USER}
+    password: ${MYSQL_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 3000
+      idle-timeout: 600000
+
+  # JPA — Flyway가 스키마 관리, JPA는 검증만
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+  # Flyway
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  # Jackson — 타임존만 설정 (직렬화 피처는 ObjectMapper 빈에서 직접 구성)
+  jackson:
+    time-zone: UTC
+
+# 서버
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Actuator — Docker 헬스체크용 (health만 노출)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+# 외부 API 키 (환경변수 필수 — 기본값 없음, 미설정 시 기동 실패)
+external:
+  finnhub:
+    api-key: ${FINNHUB_API_KEY}
+    base-url: https://finnhub.io/api/v1
+    rate-limit-per-minute: 55       # 한도 60, 안전 마진 5
+  fred:
+    api-key: ${FRED_API_KEY}
+    base-url: https://api.stlouisfed.org/fred
+  gemini:
+    api-key: ${GEMINI_API_KEY}
+    base-url: https://generativelanguage.googleapis.com/v1beta
+    model: gemini-2.5-flash-lite
+    rate-limit-per-minute: 9        # 한도 10, 안전 마진 1
+    rate-limit-per-day: 1000
+
+# HTTP Client 타임아웃
+http:
+  client:
+    connect-timeout-seconds: 3
+    read-timeout-seconds: 10
+
+# Resilience4j
+resilience4j:
+  circuitbreaker:
+    instances:
+      finnhub:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 5
+        sliding-window-size: 10
+        ignore-exceptions:
+          - io.github.resilience4j.ratelimiter.RequestNotPermitted  # Rate Limit 초과는 CB 실패 집계 제외
+      gemini:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+      fred:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+        sliding-window-size: 5
+
+  retry:
+    instances:
+      finnhub:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2   # 1s → 2s → 4s
+        ignore-exceptions:
+          - io.github.resilience4j.ratelimiter.RequestNotPermitted  # RateLimiter 거절은 재시도·CB 집계 제외
+      gemini:
+        max-attempts: 2                      # 1회 재시도 (RPM 초과 시 대기 후 1회만)
+        wait-duration: 30s                   # 429 retryDelay 평균값 기준
+        exponential-backoff-multiplier: 2    # 30s → 60s
+        ignore-exceptions:
+          - io.github.resilience4j.ratelimiter.RequestNotPermitted  # RateLimiter 거절은 재시도 금지
+      fred:
+        max-attempts: 3
+        wait-duration: 1s
+
+  ratelimiter:
+    instances:
+      finnhub:
+        limit-for-period: 9              # 10초당 9콜 = 54콜/분 — 1분 단위 버스트 방지, 균등 분배
+        limit-refresh-period: 10s
+        timeout-duration: 300s           # 127종목 배치 최대 소요 커버
+      gemini:
+        limit-for-period: 8              # 실제 한도 10 RPM, 안전 마진 2
+        limit-refresh-period: 1m
+        timeout-duration: 0s             # 한도 초과 즉시 실패 (재시도는 Retry가 담당)
+
+# 캐시 TTL (초 단위) — 07-caching.md 기준
+cache:
+  ttl:
+    stock-profile: 21600        # 6시간
+    stock-metrics: 3600         # 1시간
+    stock-news: 1800            # 30분
+    stock-summary: 21600        # 6시간
+    sector-ranking: 43200       # 12시간
+    sector-largecap: 21600      # 6시간
+    sector-growth: 21600        # 6시간
+    macro: 86400                # 24시간
+
+# 스케줄러 — 운영 환경에서는 cron 표현식으로 조정
+scheduler:
+  news-collection:
+    cron: "0 0 * * * *"         # 매 정시 (1시간마다) — Finnhub 수집만
+  llm-analysis:
+    fixed-delay-ms: 60000       # 분당 1회 — LLM 분석 전용 (수집과 분리)
+  sector-ranking:
+    cron: "0 0 21 * * *"        # 매일 06:00 KST (UTC 21:00)
+  financial-metrics:
+    cron: "0 0 20 * * *"        # 매일 05:00 KST (UTC 20:00)
+  stock-master:
+    cron: "0 30 19 * * *"       # 매일 04:30 KST (UTC 19:30) — 재무지표 수집 전 실행
+
+# 뉴스 수집 / LLM 설정
+news:
+  keywords:
+    include: "earnings,revenue,guidance,acquisition,merger,partnership,contract,FDA,approval,launch,lawsuit,regulation,downgrade,upgrade,layoff,expansion,quarterly,annual,results,beat,miss,forecast,outlook"
+  collect:
+    lookback-days: 1
+  gemini:
+    daily-limit: 20        # gemini-2.5-flash-lite 무료 일일 한도 실측값 (기존 가정 1000 → 수정)
+    per-minute-batch: 3    # 1회 실행당 처리 건수 — 20/day 한도 고려해 보수적으로 설정
+
+# 섹터 스크리닝 — 가중치는 ScoringWeights 상수로 관리 (하드코딩 제거)
+# 섹터그룹별 가중치: ScoringWeights.java 참조
+# 성장주 시총 밴드: ScoringWeights.GROWTH_MARKET_CAP_MIN/MAX 참조
+
+# 로깅
+logging:
+  level:
+    com.stocknews: INFO
+    org.springframework.web: WARN
+    org.hibernate.SQL: WARN

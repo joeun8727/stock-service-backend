@@ -1,0 +1,74 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: stocknews-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD를 .env에 설정하세요}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE를 .env에 설정하세요}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER를 .env에 설정하세요}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD를 .env에 설정하세요}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: stocknews-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stocknews-api
+    ports:
+      - "8080:8080"
+    environment:
+      # DB
+      MYSQL_DATABASE: ${MYSQL_DATABASE:?MYSQL_DATABASE를 .env에 설정하세요}
+      MYSQL_USER: ${MYSQL_USER:?MYSQL_USER를 .env에 설정하세요}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD를 .env에 설정하세요}
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Spring datasource (컨테이너 내부 호스트명 사용)
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:?MYSQL_DATABASE를 .env에 설정하세요}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:?MYSQL_USER를 .env에 설정하세요}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD를 .env에 설정하세요}
+      # 외부 API 키
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY}
+      FRED_API_KEY: ${FRED_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:
