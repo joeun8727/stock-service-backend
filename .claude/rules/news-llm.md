@@ -15,9 +15,9 @@ NewsArticle 저장 (llm_processed=false)
 [LlmAnalysisScheduler — 분당 1회, 최대 8건]
 llm_processed=false 기사 큐에서 8건 꺼냄
       ↓
-Gemini 2.5 Flash Lite 분석 (요약 + 감정 + 중요도)
+Gemini 2.5 Flash 분석 (요약 + 감정 + 중요도)
   - 429 수신 시: Retry 30s 대기 후 1회 재시도
-  - 일일 한도(1,000) 소진 시: 당일 중단 → 익일 재개
+  - 일일 한도(250) 소진 시: 당일 중단 → 익일 재개
       ↓
 NewsArticle 갱신 (llm_processed=true)
 ```
@@ -39,13 +39,13 @@ LLM 호출 **전에** 룰 기반으로 거름. 통과한 뉴스만 LLM에 보냄
 - **제외**: 단순 시세 리포트, 광고성, 동일 내용 반복.
 - 필터 키워드는 설정 파일/상수로 분리해 조정 가능하게.
 
-> 이 단계로 Gemini 무료 한도(일 1,500)를 보호. 통과율 목표 30~50%.
+> 이 단계로 Gemini 무료 한도(일 250)를 보호. 통과율 목표 30~50%.
 
 ## 3단계: Gemini LLM 분석
 
 `LLMClient` 인터페이스 경유 (`external-api.md`). 구현체 `GeminiClient`.
 
-- **모델**: Google Gemini 2.5 Flash Lite (무료 티어).
+- **모델**: Google Gemini 2.5 Flash (무료 티어).
 - **출력 (JSON 강제)**:
   ```json
   {
@@ -63,7 +63,7 @@ LLM 호출 **전에** 룰 기반으로 거름. 통과한 뉴스만 LLM에 보냄
 - **일관성 규칙**: relevance=HIGH이면 importance≥60, MEDIUM이면 importance≥30. 위반 시 llm_processed=false 유지 후 재처리.
 - 프롬프트에 기준 구간·일관성 규칙·few-shot 예시 2개 포함. "JSON만 반환, 마크다운 금지" 명시.
 - **입력**: 헤드라인 + Finnhub snippet (인메모리 큐 경유, DB 저장 금지). snippet 없는 기사는 headline만으로 fallback.
-- Rate Limit: 분당 8 (실제 한도 10 RPM, 안전 마진 2), 일 1,000. 초과 시 큐잉 후 다음 주기 처리.
+- Rate Limit: 분당 9 (실제 한도 10 RPM, 안전 마진 1), 일 250. 초과 시 큐잉 후 다음 주기 처리.
 
 ## 4단계: 저장
 

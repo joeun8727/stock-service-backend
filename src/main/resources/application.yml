@@ -69,9 +69,9 @@ external:
   gemini:
     api-key: ${GEMINI_API_KEY}
     base-url: https://generativelanguage.googleapis.com/v1beta
-    model: gemini-2.5-flash-lite
+    model: gemini-2.5-flash
     rate-limit-per-minute: 9        # 한도 10, 안전 마진 1
-    rate-limit-per-day: 1000
+    rate-limit-per-day: 250         # 무료 티어 일일 한도
 
 # HTTP Client 타임아웃
 http:
@@ -161,7 +161,7 @@ news:
   collect:
     lookback-days: 1
   gemini:
-    daily-limit: 20        # gemini-2.5-flash-lite 무료 일일 한도 실측값 (기존 가정 1000 → 수정)
+    daily-limit: 250       # gemini-2.5-flash 무료 티어 일일 한도
     per-minute-batch: 3    # 1회 실행당 처리 건수 — 20/day 한도 고려해 보수적으로 설정
 
 # 섹터 스크리닝 — 가중치는 ScoringWeights 상수로 관리 (하드코딩 제거)

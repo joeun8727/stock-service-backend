@@ -68,6 +68,8 @@
 
 > 유니크: `(stock_id, period, fiscal_date)`
 
+> ⚠️ **단위 혼재 주의**: 초기 컬럼(`roe`, `roa`, `revenue_growth_yoy`, `operating_margin` 등)은 **% 단위**(예: 70.68 = 70.68%)로 저장되고, V4에서 추가된 `fcf_margin`은 **소수 단위**(예: 0.5953 = 59.53%)로 저장됨. 계산 로직 작성 시 반드시 확인할 것.
+
 ### NewsArticle (뉴스 + LLM 분석)
 
 원문 재배포 금지 → **링크 + 요약 + 메타데이터만 저장**.

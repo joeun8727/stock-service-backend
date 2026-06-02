@@ -36,7 +36,7 @@ public interface LLMClient {
 |------|------|------|---------|
 | **Finnhub** | 분당 60콜 | 기업 뉴스, 재무지표, 프로필 | `FINNHUB_API_KEY` |
 | **FRED** | 사실상 무제한 | 거시지표 (금리, GDP 등) | `FRED_API_KEY` |
-| **Gemini 2.5 Flash Lite** | 분당 15, 일 1,000 | 뉴스 요약/감정분석 | `GEMINI_API_KEY` |
+| **Gemini 2.5 Flash** | 분당 10, 일 250 | 뉴스 요약/감정분석 | `GEMINI_API_KEY` |
 
 ## Rate Limit 관리 (필수)
 
@@ -44,7 +44,7 @@ public interface LLMClient {
 
 - **Resilience4j RateLimiter** 사용. API별로 별도 인스턴스 구성.
   - `finnhub`: 분당 60 (안전하게 55로 설정)
-  - `gemini`: 분당 15 (안전하게 13으로 설정), 일 1,000 별도 카운터
+  - `gemini`: 분당 10 (안전하게 9로 설정), 일 250 별도 카운터
 - 한도 초과 시 **백오프 후 재시도** 또는 큐잉. 절대 무한 호출 금지.
 - `ApiCallLog` 테이블에 호출 기록 (`03-data-model.md`).
 

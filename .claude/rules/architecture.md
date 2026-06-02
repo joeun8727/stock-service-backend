@@ -25,12 +25,18 @@ com.stocknews.api
 │   └── admin/           # AdminController (local/dev 수동 트리거)
 ├── domain/
 │   ├── stock/           # Stock 엔티티 + Repository + Service + Controller
+│   │                    # dto/ScoreBreakdownResponse, SentimentTrendResponse
 │   ├── sector/          # Sector, SectorController, SectorRankingService
-│   │                    # StockScreeningService (읽기 전용)
+│   │                    # StockScreeningService (읽기 전용 + getScoreBreakdown)
+│   │                    # SectorRankingService (getRuleOf40, getSectorValuation 포함)
 │   │                    # ScoringService, TrendCalculator
 │   │                    # SectorGroupConfig, ScoringWeights, IndustryToSectorMapper
 │   │                    # StockScore + StockScoreRepository
+│   │                    # dto/RuleOf40Response, ValuationResponse
 │   ├── news/            # NewsArticle 관련
+│   │                    # GlobalNewsController (/api/v1/news/top)
+│   │                    # NewsService (getSentimentTrend, getTopNews 포함)
+│   │                    # dto/TopNewsResponse
 │   └── financial/       # FinancialMetric + FinancialMetricRepository
 │                        # MetricTrend + MetricTrendRepository
 ├── client/

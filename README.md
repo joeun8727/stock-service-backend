@@ -175,8 +175,8 @@ Base URL: `http://localhost:8080/api/v1`
         ↓
 ④ llm_processed=false 로 DB 저장 (원문 본문 저장 금지)
         ↓
-⑤ Gemini 2.5 Flash-Lite LLM 분석 배치
-   → 일일 잔여 호출량 확인 (1,000건 한도; 실측 일 20건)
+⑤ Gemini 2.5 Flash LLM 분석 배치
+   → 일일 잔여 호출량 확인 (250건 한도)
    → Rate Limit 초과 시 다음 주기에 재처리 (llm_processed=false 유지)
 ```
 
@@ -222,7 +222,7 @@ GEMINI_API_KEY=<your_gemini_key>
 > API 키 발급:
 > - Finnhub: https://finnhub.io (무료 플랜, 분당 60건)
 > - FRED: https://fred.stlouisfed.org/docs/api/api_key.html (무료)
-> - Gemini: https://aistudio.google.com (무료 플랜, 분당 10건 / 일 1,000건)
+> - Gemini: https://aistudio.google.com (무료 플랜, 분당 10건 / 일 250건)
 
 ### 2-A. Docker Compose로 전체 실행 (권장)
 
