@@ -146,9 +146,9 @@ public class SectorRankingService {
 
     // ──────────────────────────────────────────────
     // GET /api/v1/sectors/{sectorId}/rule-of-40 (캐시 6시간)
+    // revenueGrowthYoy·operatingMargin 은 DB에 % 단위(예: 70.68)로 저장,
+    // fcfMargin 만 소수 단위(예: 0.5953)로 저장 — V4 추가 시 혼재.
     // ──────────────────────────────────────────────
-
-    private static final BigDecimal PCT = BigDecimal.valueOf(100);
 
     @Cacheable(value = CacheKeys.SECTOR_RULE_OF_40, key = "#sectorId + '_' + #limit")
     public RuleOf40Response getRuleOf40(Long sectorId, int limit) {
@@ -158,31 +158,33 @@ public class SectorRankingService {
         SectorGroup group = SectorGroupConfig.of(sector.getCode());
         List<FinancialMetric> metrics = financialMetricRepository.findLatestQuarterlyBySector(sectorId);
 
-        record Entry(FinancialMetric m, BigDecimal score) {}
+        record Entry(FinancialMetric m, BigDecimal r40, BigDecimal revPct,
+                     BigDecimal fcfPct, BigDecimal opPct) {}
 
         List<Entry> scored = metrics.stream()
                 .filter(m -> m.getRevenueGrowthYoy() != null)
                 .map(m -> {
-                    BigDecimal revPct  = m.getRevenueGrowthYoy().multiply(PCT).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal fcfPct  = m.getFcfMargin()       != null ? m.getFcfMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : null;
-                    BigDecimal opPct   = m.getOperatingMargin() != null ? m.getOperatingMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                    BigDecimal revPct = m.getRevenueGrowthYoy().setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal fcfPct = m.getFcfMargin() != null
+                            ? m.getFcfMargin().multiply(HUNDRED).setScale(2, RoundingMode.HALF_UP) : null;
+                    BigDecimal opPct  = m.getOperatingMargin() != null
+                            ? m.getOperatingMargin().setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
                     BigDecimal marginPct = fcfPct != null ? fcfPct.max(opPct) : opPct;
                     BigDecimal r40 = revPct.add(marginPct).setScale(2, RoundingMode.HALF_UP);
-                    return new Entry(m, r40);
+                    return new Entry(m, r40, revPct, fcfPct,
+                            m.getOperatingMargin() != null ? m.getOperatingMargin().setScale(2, RoundingMode.HALF_UP) : null);
                 })
-                .sorted(Comparator.comparing(Entry::score).reversed())
+                .sorted(Comparator.comparing(Entry::r40).reversed())
                 .toList();
 
         List<RuleOf40Item> items = new ArrayList<>();
         int rank = 1;
         for (Entry e : scored) {
             if (items.size() >= limit) break;
-            FinancialMetric m = e.m();
-            BigDecimal revPct  = m.getRevenueGrowthYoy().multiply(PCT).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal fcfPct  = m.getFcfMargin()       != null ? m.getFcfMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : null;
-            BigDecimal opPct   = m.getOperatingMargin() != null ? m.getOperatingMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : null;
-            items.add(new RuleOf40Item(rank++, m.getStock().getTicker(), m.getStock().getCompanyName(),
-                    m.getStock().getMarketCap(), revPct, fcfPct, opPct, e.score()));
+            items.add(new RuleOf40Item(rank++,
+                    e.m().getStock().getTicker(), e.m().getStock().getCompanyName(),
+                    e.m().getStock().getMarketCap(),
+                    e.revPct(), e.fcfPct(), e.opPct(), e.r40()));
         }
 
         return new RuleOf40Response(sectorId, sector.getCode(), sector.getName(), group.name(), items);
