@@ -7,11 +7,16 @@ import com.stocknews.api.common.exception.ErrorCode;
 import com.stocknews.api.domain.financial.FinancialMetric;
 import com.stocknews.api.domain.financial.FinancialMetricRepository;
 import com.stocknews.api.domain.news.NewsArticleRepository;
+import com.stocknews.api.domain.sector.SectorGroupConfig.SectorGroup;
+import com.stocknews.api.domain.sector.dto.RuleOf40Response;
+import com.stocknews.api.domain.sector.dto.RuleOf40Response.RuleOf40Item;
 import com.stocknews.api.domain.sector.dto.SectorRankingResponse;
 import com.stocknews.api.domain.sector.dto.SectorRankingResponse.Highlights;
 import com.stocknews.api.domain.sector.dto.SectorRankingResponse.SectorRankItem;
 import com.stocknews.api.domain.sector.dto.SectorTrendResponse;
 import com.stocknews.api.domain.sector.dto.SectorTrendResponse.DailyStats;
+import com.stocknews.api.domain.sector.dto.ValuationResponse;
+import com.stocknews.api.domain.sector.dto.ValuationResponse.ValuationItem;
 import com.stocknews.api.domain.stock.Stock;
 import com.stocknews.api.domain.stock.StockRepository;
 import lombok.RequiredArgsConstructor;
@@ -137,6 +142,77 @@ public class SectorRankingService {
                 .toList();
 
         return new SectorTrendResponse(sectorId, sector.getCode(), sector.getName(), stats);
+    }
+
+    // ──────────────────────────────────────────────
+    // GET /api/v1/sectors/{sectorId}/rule-of-40 (캐시 6시간)
+    // ──────────────────────────────────────────────
+
+    private static final BigDecimal PCT = BigDecimal.valueOf(100);
+
+    @Cacheable(value = CacheKeys.SECTOR_RULE_OF_40, key = "#sectorId + '_' + #limit")
+    public RuleOf40Response getRuleOf40(Long sectorId, int limit) {
+        Sector sector = sectorRepository.findById(sectorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SECTOR_NOT_FOUND));
+
+        SectorGroup group = SectorGroupConfig.of(sector.getCode());
+        List<FinancialMetric> metrics = financialMetricRepository.findLatestQuarterlyBySector(sectorId);
+
+        record Entry(FinancialMetric m, BigDecimal score) {}
+
+        List<Entry> scored = metrics.stream()
+                .filter(m -> m.getRevenueGrowthYoy() != null)
+                .map(m -> {
+                    BigDecimal revPct  = m.getRevenueGrowthYoy().multiply(PCT).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal fcfPct  = m.getFcfMargin()       != null ? m.getFcfMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : null;
+                    BigDecimal opPct   = m.getOperatingMargin() != null ? m.getOperatingMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+                    BigDecimal marginPct = fcfPct != null ? fcfPct.max(opPct) : opPct;
+                    BigDecimal r40 = revPct.add(marginPct).setScale(2, RoundingMode.HALF_UP);
+                    return new Entry(m, r40);
+                })
+                .sorted(Comparator.comparing(Entry::score).reversed())
+                .toList();
+
+        List<RuleOf40Item> items = new ArrayList<>();
+        int rank = 1;
+        for (Entry e : scored) {
+            if (items.size() >= limit) break;
+            FinancialMetric m = e.m();
+            BigDecimal revPct  = m.getRevenueGrowthYoy().multiply(PCT).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal fcfPct  = m.getFcfMargin()       != null ? m.getFcfMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : null;
+            BigDecimal opPct   = m.getOperatingMargin() != null ? m.getOperatingMargin().multiply(PCT).setScale(2, RoundingMode.HALF_UP) : null;
+            items.add(new RuleOf40Item(rank++, m.getStock().getTicker(), m.getStock().getCompanyName(),
+                    m.getStock().getMarketCap(), revPct, fcfPct, opPct, e.score()));
+        }
+
+        return new RuleOf40Response(sectorId, sector.getCode(), sector.getName(), group.name(), items);
+    }
+
+    // ──────────────────────────────────────────────
+    // GET /api/v1/sectors/{sectorId}/valuation (캐시 6시간)
+    // ──────────────────────────────────────────────
+
+    @Cacheable(value = CacheKeys.SECTOR_VALUATION, key = "#sectorId")
+    public ValuationResponse getSectorValuation(Long sectorId) {
+        Sector sector = sectorRepository.findById(sectorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.SECTOR_NOT_FOUND));
+
+        List<FinancialMetric> metrics = financialMetricRepository.findLatestQuarterlyBySector(sectorId);
+
+        List<ValuationItem> items = metrics.stream()
+                .sorted(Comparator.comparing(
+                        m -> m.getStock().getMarketCap(),
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(m -> new ValuationItem(
+                        m.getStock().getTicker(),
+                        m.getStock().getCompanyName(),
+                        m.getStock().getMarketCap(),
+                        m.getPer(), m.getPbr(), m.getPsr(), m.getPeg(),
+                        m.getEps(), m.getRoe(), m.getRoic()
+                ))
+                .toList();
+
+        return new ValuationResponse(sectorId, sector.getCode(), sector.getName(), items);
     }
 
     // ──────────────────────────────────────────────

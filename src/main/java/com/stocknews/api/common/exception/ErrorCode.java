@@ -16,6 +16,9 @@ public enum ErrorCode {
     // 종목
     STOCK_NOT_FOUND(HttpStatus.NOT_FOUND, "STOCK_001", "종목 정보를 찾을 수 없습니다."),
 
+    // 종목 스코어
+    SCORE_NOT_AVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "STOCK_002", "스코어 데이터가 아직 준비되지 않았습니다. 배치 실행 후 조회해 주세요."),
+
     // 섹터
     SECTOR_NOT_FOUND(HttpStatus.NOT_FOUND, "SECTOR_001", "섹터 정보를 찾을 수 없습니다."),
     SECTOR_RANKING_NOT_READY(HttpStatus.SERVICE_UNAVAILABLE, "SECTOR_002", "섹터 랭킹 데이터가 아직 준비되지 않았습니다."),

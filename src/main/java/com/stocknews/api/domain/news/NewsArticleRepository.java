@@ -65,6 +65,32 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long> 
     List<DailyNewsStat> dailyStatsBySector(@Param("sectorId") Long sectorId,
                                            @Param("from") LocalDateTime from);
 
+    // GET /stocks/{ticker}/sentiment-trend — 종목별 일별 감정 추이 (최근 N일)
+    @Query(value = """
+            SELECT DATE(n.published_at) AS stat_date,
+                   COUNT(*) AS news_count,
+                   AVG(n.sentiment_score) AS avg_sentiment
+            FROM news_article n
+            WHERE n.stock_id = :stockId
+              AND n.llm_processed = true
+              AND n.published_at >= :from
+            GROUP BY DATE(n.published_at)
+            ORDER BY stat_date ASC
+            """, nativeQuery = true)
+    List<DailyNewsStat> dailyStatsByStock(@Param("stockId") Long stockId,
+                                          @Param("from") LocalDateTime from);
+
+    // GET /news/top — 전체 종목 횡단 중요 뉴스 피드 (importance 필터, 최신순)
+    @Query("""
+            SELECT n FROM NewsArticle n
+            JOIN FETCH n.stock s
+            WHERE n.llmProcessed = true
+              AND (:minImportance IS NULL OR n.importanceScore >= :minImportance)
+            ORDER BY n.publishedAt DESC
+            """)
+    List<NewsArticle> findTopNewsByImportance(@Param("minImportance") Integer minImportance,
+                                              Pageable pageable);
+
     // 일별 통계 프로젝션 — MySQL DATE() → LocalDate (JDBC 드라이버가 직접 매핑)
     interface DailyNewsStat {
         LocalDate getStatDate();

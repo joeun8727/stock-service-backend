@@ -5,8 +5,10 @@ import com.stocknews.api.common.exception.BusinessException;
 import com.stocknews.api.common.exception.ErrorCode;
 import com.stocknews.api.domain.news.dto.NewsPageResponse;
 import com.stocknews.api.domain.news.dto.NewsPageResponse.NewsItemResponse;
+import com.stocknews.api.domain.news.dto.TopNewsResponse;
 import com.stocknews.api.domain.stock.Stock;
 import com.stocknews.api.domain.stock.StockRepository;
+import com.stocknews.api.domain.stock.dto.SentimentTrendResponse;
 import com.stocknews.api.domain.stock.dto.StockSummaryResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.Cacheable;
@@ -95,6 +97,62 @@ public class NewsService {
 
         return new StockSummaryResponse(upper, stock.getCompanyName(),
                 comment, avgSentiment, recent.size());
+    }
+
+    // ──────────────────────────────────────────────
+    // GET /api/v1/stocks/{ticker}/sentiment-trend (캐시 1시간)
+    // ──────────────────────────────────────────────
+
+    private static final int SENTIMENT_TREND_DAYS = 30;
+
+    @Cacheable(value = CacheKeys.STOCK_SENTIMENT_TREND, key = "#ticker.toUpperCase()")
+    public SentimentTrendResponse getSentimentTrend(String ticker) {
+        String upper = ticker.toUpperCase();
+        Stock stock = stockRepository.findByMarketAndTicker("US", upper)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND, upper));
+
+        LocalDateTime from = LocalDateTime.now().minusDays(SENTIMENT_TREND_DAYS);
+        List<NewsArticleRepository.DailyNewsStat> raw =
+                newsArticleRepository.dailyStatsByStock(stock.getId(), from);
+
+        List<SentimentTrendResponse.DailySentiment> trend = raw.stream()
+                .map(r -> new SentimentTrendResponse.DailySentiment(
+                        r.getStatDate(),
+                        r.getNewsCount(),
+                        r.getAvgSentiment() != null
+                                ? r.getAvgSentiment().setScale(4, RoundingMode.HALF_UP)
+                                : null
+                ))
+                .toList();
+
+        return new SentimentTrendResponse(upper, stock.getCompanyName(), SENTIMENT_TREND_DAYS, trend);
+    }
+
+    // ──────────────────────────────────────────────
+    // GET /api/v1/news/top (캐시 30분)
+    // ──────────────────────────────────────────────
+
+    @Cacheable(value = CacheKeys.TOP_NEWS, key = "(#minImportance == null ? 0 : #minImportance) + '_' + #size")
+    public TopNewsResponse getTopNews(Integer minImportance, int size) {
+        List<NewsArticle> articles = newsArticleRepository.findTopNewsByImportance(
+                minImportance, PageRequest.of(0, size));
+
+        List<TopNewsResponse.TopNewsItem> items = articles.stream()
+                .map(a -> new TopNewsResponse.TopNewsItem(
+                        a.getStock().getTicker(),
+                        a.getStock().getCompanyName(),
+                        a.getHeadline(),
+                        a.getSource(),
+                        a.getSourceUrl(),
+                        a.getPublishedAt(),
+                        a.getSummary(),
+                        a.getSentimentScore(),
+                        a.getImportanceScore(),
+                        a.getRelevance()
+                ))
+                .toList();
+
+        return new TopNewsResponse(items, items.size());
     }
 
     // ──────────────────────────────────────────────

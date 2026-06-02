@@ -3,9 +3,11 @@ package com.stocknews.api.domain.sector;
 import com.stocknews.api.common.exception.BusinessException;
 import com.stocknews.api.common.exception.ErrorCode;
 import com.stocknews.api.common.response.ApiResponse;
+import com.stocknews.api.domain.sector.dto.RuleOf40Response;
 import com.stocknews.api.domain.sector.dto.SectorRankingResponse;
 import com.stocknews.api.domain.sector.dto.SectorStocksResponse;
 import com.stocknews.api.domain.sector.dto.SectorTrendResponse;
+import com.stocknews.api.domain.sector.dto.ValuationResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -61,5 +63,30 @@ public class SectorController {
         };
 
         return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * GET /api/v1/sectors/{sectorId}/rule-of-40?limit=20
+     * Rule of 40 리더보드 — 매출성장률% + FCF마진%(없으면 영업이익률%) (캐시 6시간).
+     * GROWTH_TECH 섹터에서 특히 유의미.
+     */
+    @GetMapping("/{sectorId}/rule-of-40")
+    public ResponseEntity<ApiResponse<RuleOf40Response>> getRuleOf40(
+            @PathVariable Long sectorId,
+            @RequestParam(defaultValue = "20") int limit
+    ) {
+        int safeLimit = Math.min(Math.max(limit, 1), 50);
+        return ResponseEntity.ok(ApiResponse.success(sectorRankingService.getRuleOf40(sectorId, safeLimit)));
+    }
+
+    /**
+     * GET /api/v1/sectors/{sectorId}/valuation
+     * 섹터 내 종목 밸류에이션 비교 — PER/PBR/PSR/PEG 일괄 조회, 시총 내림차순 (캐시 6시간).
+     */
+    @GetMapping("/{sectorId}/valuation")
+    public ResponseEntity<ApiResponse<ValuationResponse>> getSectorValuation(
+            @PathVariable Long sectorId
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(sectorRankingService.getSectorValuation(sectorId)));
     }
 }

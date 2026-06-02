@@ -1,5 +1,8 @@
 package com.stocknews.api.domain.sector;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.stocknews.api.common.config.CacheKeys;
 import com.stocknews.api.common.exception.BusinessException;
 import com.stocknews.api.common.exception.ErrorCode;
@@ -8,6 +11,9 @@ import com.stocknews.api.domain.financial.FinancialMetricRepository;
 import com.stocknews.api.domain.sector.dto.SectorStocksResponse;
 import com.stocknews.api.domain.sector.dto.SectorStocksResponse.MetricsSnapshot;
 import com.stocknews.api.domain.sector.dto.SectorStocksResponse.StockScreenResult;
+import com.stocknews.api.domain.stock.Stock;
+import com.stocknews.api.domain.stock.StockRepository;
+import com.stocknews.api.domain.stock.dto.ScoreBreakdownResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.Cacheable;
@@ -15,7 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -33,7 +41,9 @@ public class StockScreeningService {
     private final SectorRepository          sectorRepository;
     private final StockScoreRepository      stockScoreRepository;
     private final FinancialMetricRepository financialMetricRepository;
+    private final StockRepository           stockRepository;
     private final ScoringService            scoringService;
+    private final ObjectMapper              objectMapper;
 
     // ──────────────────────────────────────────────
     // GET /api/v1/sectors/{sectorId}/stocks?type=large_cap
@@ -69,6 +79,48 @@ public class StockScreeningService {
 
         List<StockScreenResult> results = buildResults(scores, limit, true);
         return new SectorStocksResponse(sectorId, sector.getCode(), sector.getName(), "growth", results);
+    }
+
+    // ──────────────────────────────────────────────
+    // GET /api/v1/stocks/{ticker}/score-breakdown (캐시 6시간)
+    // ──────────────────────────────────────────────
+
+    @Cacheable(value = CacheKeys.STOCK_SCORE_BREAKDOWN, key = "#ticker.toUpperCase()")
+    public ScoreBreakdownResponse getScoreBreakdown(String ticker) {
+        String upper = ticker.toUpperCase();
+        Stock stock = stockRepository.findByMarketAndTicker("US", upper)
+                .orElseThrow(() -> new BusinessException(ErrorCode.STOCK_NOT_FOUND, upper));
+
+        List<StockScore> scores = stockScoreRepository.findByStockId(stock.getId());
+        if (scores.isEmpty()) {
+            throw new BusinessException(ErrorCode.SCORE_NOT_AVAILABLE, upper);
+        }
+
+        String sectorCode = stock.getSector() != null ? stock.getSector().getCode() : null;
+        String sectorName = stock.getSector() != null ? stock.getSector().getName() : null;
+
+        List<ScoreBreakdownResponse.ScoreEntry> entries = scores.stream()
+                .map(ss -> new ScoreBreakdownResponse.ScoreEntry(
+                        ss.getScreenType(),
+                        ss.getSectorGroup(),
+                        ss.getTotalScore(),
+                        ss.getRankInSector(),
+                        parseScoreDetail(ss.getScoreDetail()),
+                        ss.getScoredAt()
+                ))
+                .toList();
+
+        return new ScoreBreakdownResponse(upper, stock.getCompanyName(), sectorCode, sectorName, entries);
+    }
+
+    private Map<String, Double> parseScoreDetail(String json) {
+        if (json == null || json.isBlank()) return Collections.emptyMap();
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Double>>() {});
+        } catch (JsonProcessingException e) {
+            log.warn("score_detail JSON 파싱 실패: {}", e.getMessage());
+            return Collections.emptyMap();
+        }
     }
 
     // ──────────────────────────────────────────────

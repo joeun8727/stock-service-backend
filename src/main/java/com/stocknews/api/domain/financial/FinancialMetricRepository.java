@@ -41,6 +41,19 @@ public interface FinancialMetricRepository extends JpaRepository<FinancialMetric
     // 섹터 랭킹 모멘텀: 종목의 최근 2개 분기 지표 (영업이익률 추이 비교용)
     List<FinancialMetric> findTop2ByStockIdAndPeriodOrderByFiscalDateDesc(Long stockId, String period);
 
+    // GET /sectors/{id}/rule-of-40, /valuation — 섹터 내 종목별 최신 분기 지표 일괄 조회
+    @Query("""
+            SELECT fm FROM FinancialMetric fm
+            JOIN FETCH fm.stock s
+            WHERE s.sector.id = :sectorId
+              AND fm.period = 'quarterly'
+              AND fm.fiscalDate = (
+                  SELECT MAX(fm2.fiscalDate) FROM FinancialMetric fm2
+                  WHERE fm2.stock.id = fm.stock.id AND fm2.period = 'quarterly'
+              )
+            """)
+    List<FinancialMetric> findLatestQuarterlyBySector(@Param("sectorId") Long sectorId);
+
     // 스케줄러: 특정 분기 지표가 없는 종목 ID 목록 조회 (미수집 종목만 처리용)
     @Query("""
             SELECT st FROM Stock st

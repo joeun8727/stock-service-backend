@@ -46,14 +46,19 @@ public class RedisConfig {
                 .disableCachingNullValues();
 
         Map<String, RedisCacheConfiguration> cacheConfigs = new HashMap<>();
-        cacheConfigs.put(CacheKeys.STOCK_PROFILE, defaultConfig.entryTtl(Duration.ofSeconds(stockProfileTtl)));
-        cacheConfigs.put(CacheKeys.STOCK_METRICS, defaultConfig.entryTtl(Duration.ofSeconds(stockMetricsTtl)));
-        cacheConfigs.put(CacheKeys.STOCK_NEWS, defaultConfig.entryTtl(Duration.ofSeconds(stockNewsTtl)));
-        cacheConfigs.put(CacheKeys.STOCK_SUMMARY, defaultConfig.entryTtl(Duration.ofSeconds(stockSummaryTtl)));
-        cacheConfigs.put(CacheKeys.SECTOR_RANKING, defaultConfig.entryTtl(Duration.ofSeconds(sectorRankingTtl)));
-        cacheConfigs.put(CacheKeys.SECTOR_LARGECAP, defaultConfig.entryTtl(Duration.ofSeconds(sectorLargecapTtl)));
-        cacheConfigs.put(CacheKeys.SECTOR_GROWTH, defaultConfig.entryTtl(Duration.ofSeconds(sectorGrowthTtl)));
-        cacheConfigs.put(CacheKeys.MACRO, defaultConfig.entryTtl(Duration.ofSeconds(macroTtl)));
+        cacheConfigs.put(CacheKeys.STOCK_PROFILE,         defaultConfig.entryTtl(Duration.ofSeconds(stockProfileTtl)));
+        cacheConfigs.put(CacheKeys.STOCK_METRICS,         defaultConfig.entryTtl(Duration.ofSeconds(stockMetricsTtl)));
+        cacheConfigs.put(CacheKeys.STOCK_NEWS,            defaultConfig.entryTtl(Duration.ofSeconds(stockNewsTtl)));
+        cacheConfigs.put(CacheKeys.STOCK_SUMMARY,         defaultConfig.entryTtl(Duration.ofSeconds(stockSummaryTtl)));
+        cacheConfigs.put(CacheKeys.STOCK_SCORE_BREAKDOWN, defaultConfig.entryTtl(Duration.ofSeconds(stockProfileTtl)));   // 6h — 배치 주기와 동일
+        cacheConfigs.put(CacheKeys.STOCK_SENTIMENT_TREND, defaultConfig.entryTtl(Duration.ofSeconds(stockMetricsTtl)));  // 1h — 뉴스 수집 주기와 동일
+        cacheConfigs.put(CacheKeys.SECTOR_RANKING,        defaultConfig.entryTtl(Duration.ofSeconds(sectorRankingTtl)));
+        cacheConfigs.put(CacheKeys.SECTOR_LARGECAP,       defaultConfig.entryTtl(Duration.ofSeconds(sectorLargecapTtl)));
+        cacheConfigs.put(CacheKeys.SECTOR_GROWTH,         defaultConfig.entryTtl(Duration.ofSeconds(sectorGrowthTtl)));
+        cacheConfigs.put(CacheKeys.SECTOR_RULE_OF_40,     defaultConfig.entryTtl(Duration.ofSeconds(sectorLargecapTtl))); // 6h — 배치 주기와 동일
+        cacheConfigs.put(CacheKeys.SECTOR_VALUATION,      defaultConfig.entryTtl(Duration.ofSeconds(sectorLargecapTtl))); // 6h — 배치 주기와 동일
+        cacheConfigs.put(CacheKeys.TOP_NEWS,              defaultConfig.entryTtl(Duration.ofSeconds(stockNewsTtl)));      // 30min — 뉴스 수집 주기와 동일
+        cacheConfigs.put(CacheKeys.MACRO,                 defaultConfig.entryTtl(Duration.ofSeconds(macroTtl)));
 
         return RedisCacheManager.builder(factory)
                 .cacheDefaults(defaultConfig)

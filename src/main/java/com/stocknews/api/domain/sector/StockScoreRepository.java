@@ -11,6 +11,9 @@ public interface StockScoreRepository extends JpaRepository<StockScore, Long> {
 
     Optional<StockScore> findByStockIdAndScreenType(Long stockId, String screenType);
 
+    // GET /stocks/{ticker}/score-breakdown — 종목의 모든 스코어 유형 조회 (LARGE_CAP + GROWTH)
+    List<StockScore> findByStockId(Long stockId);
+
     @Query("""
             SELECT ss FROM StockScore ss
             JOIN FETCH ss.stock st
